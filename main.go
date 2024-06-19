@@ -1,3 +1,15 @@
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
@@ -6,7 +18,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/line/line-bot-sdk-go/v8/linebot"
@@ -74,25 +85,20 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		switch e := event.(type) {
 		case webhook.MessageEvent:
 			switch message := e.Message.(type) {
+			// Handle only on text message
 			case webhook.TextMessageContent:
 				req := message.Text
-				// 檢查是否是汽車相關問題（這裡以包含 "mazda" 為例）
-				if !strings.Contains(req, "mazda") {
-					if err := replyText(e.ReplyToken, "抱歉，我們只處理與 Mazda 車輛相關的問題。"); err != nil {
-						log.Print(err)
-					}
-					continue
-				}
+				// 檢查是否已經有這個用戶的 ChatSession or req == "reset"
 
 				// 取得用戶 ID
 				var uID string
 				switch source := e.Source.(type) {
 				case *webhook.UserSource:
-					uID = source.UserID
+					uID = source.UserId
 				case *webhook.GroupSource:
-					uID = source.GroupID
+					uID = source.UserId
 				case *webhook.RoomSource:
-					uID = source.RoomID
+					uID = source.UserId
 				}
 
 				// 檢查是否已經有這個用戶的 ChatSession
@@ -117,22 +123,24 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 				if err := replyText(e.ReplyToken, ret); err != nil {
 					log.Print(err)
 				}
+			// Handle only on Sticker message
 			case webhook.StickerMessageContent:
 				var kw string
 				for _, k := range message.Keywords {
 					kw = kw + "," + k
 				}
 
-				outStickerResult := fmt.Sprintf("收到貼圖訊息: %s, pkg: %s kw: %s  text: %s", message.StickerID, message.PackageID, kw, message.Text)
+				outStickerResult := fmt.Sprintf("收到貼圖訊息: %s, pkg: %s kw: %s  text: %s", message.StickerId, message.PackageId, kw, message.Text)
 				if err := replyText(e.ReplyToken, outStickerResult); err != nil {
 					log.Print(err)
 				}
 
+			// Handle only image message
 			case webhook.ImageMessageContent:
-				log.Println("Got img msg ID:", message.ID)
+				log.Println("Got img msg ID:", message.Id)
 
 				//Get image binary from LINE server based on message ID.
-				content, err := blob.GetMessageContent(message.ID)
+				content, err := blob.GetMessageContent(message.Id)
 				if err != nil {
 					log.Println("Got GetMessageContent err:", err)
 				}
@@ -149,8 +157,9 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 					log.Print(err)
 				}
 
+			// Handle only video message
 			case webhook.VideoMessageContent:
-				log.Println("Got video msg ID:", message.ID)
+				log.Println("Got video msg ID:", message.Id)
 
 			default:
 				log.Printf("Unknown message: %v", message)
@@ -161,32 +170,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 			data := e.Postback.Data
 			log.Printf("Unknown message: Got postback: " + data)
 		case webhook.BeaconEvent:
-			log.Printf("Got beacon: " + e.Beacon.HWID)
+			log.Printf("Got beacon: " + e.Beacon.Hwid)
 		}
 	}
-}
-
-func send(cs *genai.ChatSession, req string) *genai.Response {
-	// 假設這裡是調用 genai API 來處理用戶輸入並返回相應的回應
-	// 在這裡可以加入條件判斷，確保只處理與 Mazda 相關的問題
-	// 假設使用 genai 套件的功能來處理用戶輸入，並返回回應
-	return cs.Process(req)
-}
-
-func startNewChatSession() *genai.ChatSession {
-	// 假設這裡是初始化一個新的 ChatSession 的地方
-	// 你可以根據需要進行 ChatSession 的初始化
-	return genai.NewChatSession()
-}
-
-func printResponse(res *genai.Response) string {
-	// 假設這裡是將 genai 返回的回應格式化成文字訊息的函數
-	// 你可以根據實際情況來定義這個函數的邏輯
-	return res.Text
-}
-
-func GeminiImage(data []byte) (string, error) {
-	// 假設這裡是處理圖片的 gemini 函數
-	// 在這裡加入適當的處理邏輯，並返回相應的結果和可能的錯誤
-	return "Gemini image response", nil
 }
