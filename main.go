@@ -192,5 +192,20 @@ func startNewChatSession() *genai.ChatSession {
 	return nil // 這裡需要根據具體需求實現
 }
 
-func send(session *genai.ChatSession, question string) string {
-	// 實現處理問題並返回回答的邏
+func send(cs *genai.ChatSession, req string) string {
+	// 假設這裡使用 ChatSession 與 Gemini 進行交互並返回回答
+	// 假設這裡使用 req 直接回覆一個固定的文字，實際應用中需要進行更複雜的處理
+	return "這是一個固定的回答，實際上應該根據 ChatSession 與 Gemini 進行交互"
+}
+
+func startNewChatSession() *genai.ChatSession {
+	// 假設這裡初始化一個新的 ChatSession 實例並返回
+	// 實際應用中應該根據具體需求來初始化 ChatSession
+	return &genai.ChatSession{} // 這裡應該返回一個實際初始化的 ChatSession 實例
+}
+
+func GeminiImage(data []byte) (string, error) {
+	// 實作處理圖片的邏輯，並返回結果
+	// 這裡只是一個示例，實際應用中需要根據 Gemini API 的實際需求來處理圖片內容
+	return "這是一個示例結果", nil
+}
