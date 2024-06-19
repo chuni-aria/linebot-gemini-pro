@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/line/line-bot-sdk-go/v8/linebot"
@@ -74,16 +73,10 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		switch e := event.(type) {
 		case webhook.MessageEvent:
 			switch message := e.Message.(type) {
-			// Handle only text message
+			// Handle only on text message
 			case webhook.TextMessageContent:
 				req := message.Text
-				// 檢查是否是有關汽車的問題
-				if !isCarRelatedQuestion(req) {
-					if err := replyText(e.ReplyToken, "抱歉，我只能回答有關 Mazda 車輛的問題。"); err != nil {
-						log.Print(err)
-					}
-					continue
-				}
+				// 檢查是否已經有這個用戶的 ChatSession or req == "reset"
 
 				// 取得用戶 ID
 				var uID string
@@ -112,8 +105,15 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 					}
 					continue
 				}
+
+				// 限制使用者問題的範圍（這裡以汽車相關問題為例）
+				if !isCarRelatedQuestion(req) {
+					replyText(e.ReplyToken, "抱歉，我們只回答汽車相關的問題。")
+					continue
+				}
+
 				// 使用這個 ChatSession 來處理訊息 & Reply with Gemini result
-				res := send(cs, req)
+				res := send(cs, req) // 假設 send 函式用於處理 ChatSession 並返回回答
 				ret := printResponse(res)
 				if err := replyText(e.ReplyToken, ret); err != nil {
 					log.Print(err)
@@ -170,34 +170,27 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func isCarRelatedQuestion(text string) bool {
-	// 簡單示例，判斷是否包含汽車相關的關鍵字
-	keywords := []string{"汽車", "車輛", "Mazda"}
-	for _, kw := range keywords {
-		if strings.Contains(strings.ToLower(text), kw) {
-			return true
-		}
+func isCarRelatedQuestion(question string) bool {
+	// 在這裡實現判斷是否是汽車相關問題的邏輯
+	// 例如，可以檢查問題中是否包含 "汽車"、"車輛"、"Mazda" 等關鍵字
+	// 這裡只是一個示例，你需要根據實際需求來實現判斷邏輯
+	if containsKeyword(question, "汽車") || containsKeyword(question, "車輛") || containsKeyword(question, "Mazda") {
+		return true
 	}
 	return false
 }
 
-func send(cs *genai.ChatSession, question string) string {
-	// 在這裡實現與 Gemini API 的互動，確保只回答有關 Mazda 車輛的問題
-	// 假設這裡是與 Gemini API 交互的部分，並返回回應結果
-	return "這裡是 Gemini API 的回答"
+func containsKeyword(question, keyword string) bool {
+	// 實現一個簡單的關鍵字包含判斷
+	// 可以根據實際需求進行擴展
+	return strings.Contains(strings.ToLower(question), keyword)
 }
 
 func startNewChatSession() *genai.ChatSession {
-	// 建立新的 ChatSession 的邏輯
-	return &genai.ChatSession{}
+	// 實現創建新 ChatSession 的邏輯
+	// 這裡可以初始化 ChatSession 並返回
+	return nil // 這裡需要根據具體需求實現
 }
 
-func printResponse(res string) string {
-	// 處理 Gemini API 回應的邏輯，並返回格式化的文本回應
-	return "Gemini API 的回應: " + res
-}
-
-func GeminiImage(data []byte) (string, error) {
-	// 處理圖片相關的 Gemini API 互動，並返回結果
-	return "這裡是 Gemini API 的圖片回答", nil
-}
+func send(session *genai.ChatSession, question string) string {
+	// 實現處理問題並返回回答的邏
