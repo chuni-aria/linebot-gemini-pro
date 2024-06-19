@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/line/line-bot-sdk-go/v8/linebot"
@@ -73,20 +74,25 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		switch e := event.(type) {
 		case webhook.MessageEvent:
 			switch message := e.Message.(type) {
-			// Handle only on text message
 			case webhook.TextMessageContent:
 				req := message.Text
-				// 檢查是否已經有這個用戶的 ChatSession or req == "reset"
+				// 檢查是否是汽車相關問題（這裡以包含 "mazda" 為例）
+				if !strings.Contains(req, "mazda") {
+					if err := replyText(e.ReplyToken, "抱歉，我們只處理與 Mazda 車輛相關的問題。"); err != nil {
+						log.Print(err)
+					}
+					continue
+				}
 
 				// 取得用戶 ID
 				var uID string
 				switch source := e.Source.(type) {
 				case *webhook.UserSource:
-					uID = source.UserId
+					uID = source.UserID
 				case *webhook.GroupSource:
-					uID = source.UserId
+					uID = source.GroupID
 				case *webhook.RoomSource:
-					uID = source.UserId
+					uID = source.RoomID
 				}
 
 				// 檢查是否已經有這個用戶的 ChatSession
@@ -105,37 +111,28 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 					}
 					continue
 				}
-
-				// 限制使用者問題的範圍（這裡以汽車相關問題為例）
-				if !isCarRelatedQuestion(req) {
-					replyText(e.ReplyToken, "抱歉，我們只回答汽車相關的問題。")
-					continue
-				}
-
 				// 使用這個 ChatSession 來處理訊息 & Reply with Gemini result
-				res := send(cs, req) // 假設 send 函式用於處理 ChatSession 並返回回答
+				res := send(cs, req)
 				ret := printResponse(res)
 				if err := replyText(e.ReplyToken, ret); err != nil {
 					log.Print(err)
 				}
-			// Handle only on Sticker message
 			case webhook.StickerMessageContent:
 				var kw string
 				for _, k := range message.Keywords {
 					kw = kw + "," + k
 				}
 
-				outStickerResult := fmt.Sprintf("收到貼圖訊息: %s, pkg: %s kw: %s  text: %s", message.StickerId, message.PackageId, kw, message.Text)
+				outStickerResult := fmt.Sprintf("收到貼圖訊息: %s, pkg: %s kw: %s  text: %s", message.StickerID, message.PackageID, kw, message.Text)
 				if err := replyText(e.ReplyToken, outStickerResult); err != nil {
 					log.Print(err)
 				}
 
-			// Handle only image message
 			case webhook.ImageMessageContent:
-				log.Println("Got img msg ID:", message.Id)
+				log.Println("Got img msg ID:", message.ID)
 
 				//Get image binary from LINE server based on message ID.
-				content, err := blob.GetMessageContent(message.Id)
+				content, err := blob.GetMessageContent(message.ID)
 				if err != nil {
 					log.Println("Got GetMessageContent err:", err)
 				}
@@ -152,9 +149,8 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 					log.Print(err)
 				}
 
-			// Handle only video message
 			case webhook.VideoMessageContent:
-				log.Println("Got video msg ID:", message.Id)
+				log.Println("Got video msg ID:", message.ID)
 
 			default:
 				log.Printf("Unknown message: %v", message)
@@ -165,47 +161,32 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 			data := e.Postback.Data
 			log.Printf("Unknown message: Got postback: " + data)
 		case webhook.BeaconEvent:
-			log.Printf("Got beacon: " + e.Beacon.Hwid)
+			log.Printf("Got beacon: " + e.Beacon.HWID)
 		}
 	}
 }
 
-func isCarRelatedQuestion(question string) bool {
-	// 在這裡實現判斷是否是汽車相關問題的邏輯
-	// 例如，可以檢查問題中是否包含 "汽車"、"車輛"、"Mazda" 等關鍵字
-	// 這裡只是一個示例，你需要根據實際需求來實現判斷邏輯
-	if containsKeyword(question, "汽車") || containsKeyword(question, "車輛") || containsKeyword(question, "Mazda") {
-		return true
-	}
-	return false
-}
-
-func containsKeyword(question, keyword string) bool {
-	// 實現一個簡單的關鍵字包含判斷
-	// 可以根據實際需求進行擴展
-	return strings.Contains(strings.ToLower(question), keyword)
+func send(cs *genai.ChatSession, req string) *genai.Response {
+	// 假設這裡是調用 genai API 來處理用戶輸入並返回相應的回應
+	// 在這裡可以加入條件判斷，確保只處理與 Mazda 相關的問題
+	// 假設使用 genai 套件的功能來處理用戶輸入，並返回回應
+	return cs.Process(req)
 }
 
 func startNewChatSession() *genai.ChatSession {
-	// 實現創建新 ChatSession 的邏輯
-	// 這裡可以初始化 ChatSession 並返回
-	return nil // 這裡需要根據具體需求實現
+	// 假設這裡是初始化一個新的 ChatSession 的地方
+	// 你可以根據需要進行 ChatSession 的初始化
+	return genai.NewChatSession()
 }
 
-func send(cs *genai.ChatSession, req string) string {
-	// 假設這裡使用 ChatSession 與 Gemini 進行交互並返回回答
-	// 假設這裡使用 req 直接回覆一個固定的文字，實際應用中需要進行更複雜的處理
-	return "這是一個固定的回答，實際上應該根據 ChatSession 與 Gemini 進行交互"
-}
-
-func startNewChatSession() *genai.ChatSession {
-	// 假設這裡初始化一個新的 ChatSession 實例並返回
-	// 實際應用中應該根據具體需求來初始化 ChatSession
-	return &genai.ChatSession{} // 這裡應該返回一個實際初始化的 ChatSession 實例
+func printResponse(res *genai.Response) string {
+	// 假設這裡是將 genai 返回的回應格式化成文字訊息的函數
+	// 你可以根據實際情況來定義這個函數的邏輯
+	return res.Text
 }
 
 func GeminiImage(data []byte) (string, error) {
-	// 實作處理圖片的邏輯，並返回結果
-	// 這裡只是一個示例，實際應用中需要根據 Gemini API 的實際需求來處理圖片內容
-	return "這是一個示例結果", nil
+	// 假設這裡是處理圖片的 gemini 函數
+	// 在這裡加入適當的處理邏輯，並返回相應的結果和可能的錯誤
+	return "Gemini image response", nil
 }
