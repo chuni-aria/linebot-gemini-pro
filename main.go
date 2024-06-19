@@ -1,15 +1,3 @@
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package main
 
 import (
@@ -18,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/line/line-bot-sdk-go/v8/linebot"
@@ -85,10 +74,16 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		switch e := event.(type) {
 		case webhook.MessageEvent:
 			switch message := e.Message.(type) {
-			// Handle only on text message
+			// Handle only text message
 			case webhook.TextMessageContent:
 				req := message.Text
-				// 檢查是否已經有這個用戶的 ChatSession or req == "reset"
+				// 檢查是否是有關汽車的問題
+				if !isCarRelatedQuestion(req) {
+					if err := replyText(e.ReplyToken, "抱歉，我只能回答有關 Mazda 車輛的問題。"); err != nil {
+						log.Print(err)
+					}
+					continue
+				}
 
 				// 取得用戶 ID
 				var uID string
@@ -173,4 +168,36 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Got beacon: " + e.Beacon.Hwid)
 		}
 	}
+}
+
+func isCarRelatedQuestion(text string) bool {
+	// 簡單示例，判斷是否包含汽車相關的關鍵字
+	keywords := []string{"汽車", "車輛", "Mazda"}
+	for _, kw := range keywords {
+		if strings.Contains(strings.ToLower(text), kw) {
+			return true
+		}
+	}
+	return false
+}
+
+func send(cs *genai.ChatSession, question string) string {
+	// 在這裡實現與 Gemini API 的互動，確保只回答有關 Mazda 車輛的問題
+	// 假設這裡是與 Gemini API 交互的部分，並返回回應結果
+	return "這裡是 Gemini API 的回答"
+}
+
+func startNewChatSession() *genai.ChatSession {
+	// 建立新的 ChatSession 的邏輯
+	return &genai.ChatSession{}
+}
+
+func printResponse(res string) string {
+	// 處理 Gemini API 回應的邏輯，並返回格式化的文本回應
+	return "Gemini API 的回應: " + res
+}
+
+func GeminiImage(data []byte) (string, error) {
+	// 處理圖片相關的 Gemini API 互動，並返回結果
+	return "這裡是 Gemini API 的圖片回答", nil
 }
