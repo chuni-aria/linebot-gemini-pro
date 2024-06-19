@@ -1,3 +1,15 @@
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
@@ -6,7 +18,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/line/line-bot-sdk-go/v8/linebot"
@@ -77,6 +88,8 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 			// Handle only on text message
 			case webhook.TextMessageContent:
 				req := message.Text
+				// 檢查是否已經有這個用戶的 ChatSession or req == "reset"
+
 				// 取得用戶 ID
 				var uID string
 				switch source := e.Source.(type) {
@@ -86,14 +99,6 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 					uID = source.UserId
 				case *webhook.RoomSource:
 					uID = source.UserId
-				}
-
-				// 檢查問題是否與汽車相關
-				if !isCarRelated(req) {
-					if err := replyText(e.ReplyToken, "抱歉，我只能回答汽車相關的問題。"); err != nil {
-						log.Print(err)
-					}
-					continue
 				}
 
 				// 檢查是否已經有這個用戶的 ChatSession
@@ -114,7 +119,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				// 使用這個 ChatSession 來處理訊息 & Reply with Gemini result
 				res := send(cs, req)
-				ret := filterMazdaCars(res)
+				ret := printResponse(res)
 				if err := replyText(e.ReplyToken, ret); err != nil {
 					log.Print(err)
 				}
@@ -169,31 +174,3 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
-
-// 檢查問題是否與汽車相關的輔助函數
-func isCarRelated(question string) bool {
-	// 這裡你可以根據需要添加更多關鍵字
-	carKeywords := []string{"車", "車子", "汽車", "SUV", "轎車", "車款"}
-	for _, keyword := range carKeywords {
-		if strings.Contains(strings.ToLower(question), strings.ToLower(keyword)) {
-			return true
-		}
-	}
-	return false
-}
-
-// 過濾只推薦Mazda車款的回應
-func filterMazdaCars(resp *genai.GenerateContentResponse) string {
-	var ret string
-	for _, cand := range resp.Candidates {
-		for _, part := range cand.Content.Parts {
-			if strings.Contains(strings.ToLower(part.Text), "mazda") {
-				ret = ret + fmt.Sprintf("%v", part.Text)
-				log.Println(part.Text)
-			}
-		}
-	}
-	if ret == "" {
-		ret = "目前我們僅能提供Mazda的車款資訊。"
-	}
-	return ret
