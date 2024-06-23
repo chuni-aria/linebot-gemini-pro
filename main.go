@@ -1,23 +1,13 @@
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/line/line-bot-sdk-go/v8/linebot"
@@ -30,8 +20,9 @@ var blob *messaging_api.MessagingApiBlobAPI
 var geminiKey string
 var channelToken string
 
-// 建立一個 map 來儲存每個用戶的 ChatSession
+// 建立一個 map 來儲存每個用戶的 ChatSession 和 提示語
 var userSessions = make(map[string]*genai.ChatSession)
+var userPrompts = make(map[string]string)
 
 func main() {
 	var err error
@@ -62,8 +53,7 @@ func replyText(replyToken, text string) error {
 					Text: text,
 				},
 			},
-		},
-	); err != nil {
+		); err != nil {
 		return err
 	}
 	return nil
@@ -88,7 +78,6 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 			// Handle only on text message
 			case webhook.TextMessageContent:
 				req := message.Text
-				// 檢查是否已經有這個用戶的 ChatSession or req == "reset"
 
 				// 取得用戶 ID
 				var uID string
@@ -99,6 +88,16 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 					uID = source.UserId
 				case *webhook.RoomSource:
 					uID = source.UserId
+				}
+
+				// 處理設定提示語命令
+				if len(req) > 7 && req[:7] == "提示語設定:" {
+					prompt := req[7:]
+					userPrompts[uID] = prompt
+					if err := replyText(e.ReplyToken, "提示語已更新。"); err != nil {
+						log.Print(err)
+					}
+					continue
 				}
 
 				// 檢查是否已經有這個用戶的 ChatSession
@@ -117,12 +116,28 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 					}
 					continue
 				}
-				// 使用這個 ChatSession 來處理訊息 & Reply with Gemini result
+
+				// 過濾非Mazda相關的問題
+				if !isMazdaRelated(req) {
+					if err := replyText(e.ReplyToken, "不好意思，我只會回復mazda相關的問題喔。"); err != nil {
+						log.Print(err)
+					}
+					continue
+				}
+
+				// 使用這個 ChatSession 和提示語來處理訊息
+				prompt, hasPrompt := userPrompts[uID]
+				if hasPrompt {
+					req = prompt + " " + req
+				}
+
+				// Reply with Gemini result
 				res := send(cs, req)
 				ret := printResponse(res)
 				if err := replyText(e.ReplyToken, ret); err != nil {
 					log.Print(err)
 				}
+
 			// Handle only on Sticker message
 			case webhook.StickerMessageContent:
 				var kw string
@@ -139,7 +154,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 			case webhook.ImageMessageContent:
 				log.Println("Got img msg ID:", message.Id)
 
-				//Get image binary from LINE server based on message ID.
+				// Get image binary from LINE server based on message ID.
 				content, err := blob.GetMessageContent(message.Id)
 				if err != nil {
 					log.Println("Got GetMessageContent err:", err)
@@ -149,10 +164,14 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					log.Fatal(err)
 				}
-				ret, err := GeminiImage(data)
-				if err != nil {
-					ret = "無法辨識圖片內容，請重新輸入:" + err.Error()
-				}
+
+				// Encode image data to base64
+				encodedImage := base64.StdEncoding.EncodeToString(data)
+
+				// Set up request for Gemini API
+				req := fmt.Sprintf("Describe this image: %s", encodedImage)
+				res := send(cs, req)
+				ret := printResponse(res)
 				if err := replyText(e.ReplyToken, ret); err != nil {
 					log.Print(err)
 				}
@@ -173,4 +192,31 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Got beacon: " + e.Beacon.Hwid)
 		}
 	}
+}
+
+// Dummy functions for Gemini API interaction and chat session management
+func startNewChatSession() *genai.ChatSession {
+	// Dummy implementation
+	return &genai.ChatSession{}
+}
+
+func send(cs *genai.ChatSession, req string) *genai.ChatResponse {
+	// Dummy implementation
+	return &genai.ChatResponse{}
+}
+
+func printResponse(res *genai.ChatResponse) string {
+	// Dummy implementation
+	return "Response from Gemini API"
+}
+
+func isMazdaRelated(req string) bool {
+	// 檢查是否包含 Mazda 相關關鍵詞
+	mazdaKeywords := []string{"mazda", "Mazda", "馬自達", "MAZDA"}
+	for _, keyword := range mazdaKeywords {
+		if strings.Contains(req, keyword) {
+			return true
+		}
+	}
+	return false
 }
