@@ -13,7 +13,6 @@ RUN go mod download
 # 將本地的源碼文件複製到容器的工作目錄
 # COPY . .
 
-RUN go mod tidy
 # 編譯應用程式
 RUN go build -o main .
 
