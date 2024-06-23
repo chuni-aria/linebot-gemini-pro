@@ -112,7 +112,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 					// 如果需要重置記憶，創建一個新的 ChatSession
 					cs = startNewChatSession()
 					userSessions[uID] = cs
-					if err := replyText(e.ReplyToken, "很高興初次見到你，請問有什麼想了解的嗎？"); err != nil {
+					if err := replyText(e.ReplyToken, "您好，歡迎使用，請輸入您想詢問的MAZDA車款，例如:家庭人數、需求、預算等。(請一定要輸入MAZDA車款)"); err != nil {
 						log.Print(err)
 					}
 					continue
